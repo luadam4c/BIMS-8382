@@ -1,0 +1,73 @@
+---
+title: "Gapminder Analysis"
+author: "Stephen Turner"
+date: "January 1, 2017"
+output: pdf_document
+---
+
+# Introduction 
+  
+This is my first RMarkdown document! 
+  
+# Let's embed some R code 
+  
+Let's load the **Gapminder** data: 
+
+```{r cache = TRUE} 
+library(dplyr) 
+library(readr) 
+gm <- read_csv('../data/gapminder.csv') 
+head(gm) 
+``` 
+
+```{r echo = FALSE, results = 'hold'} 
+head(gm) 
+tail(gm) 
+``` 
+
+```{r, results='asis'} 
+library(knitr) 
+kable(head(gm)) 
+``` 
+
+The mean life expectancy is `r mean(gm$lifeExp)` years. 
+
+The years surveyed in this data include: `r unique(gm$year)`. 
+
+# Session Information 
+
+```{r} 
+sessionInfo() 
+``` 
+
+# Make a figure
+
+```{r, fig.cap='Life Exp vs GDP'} 
+library(ggplot2) 
+ggplot(gm, aes(gdpPercap, lifeExp)) + geom_point() 
+``` 
+
+# Make another figure
+
+```{r, fig.cap='Life Exp vs GDP'} 
+library(ggplot2) 
+ggplot(gm, aes(gdpPercap, lifeExp)) +  
+geom_point() +  
+scale_x_log10() +  
+aes(col=continent) 
+```
+
+# Options
+
+* echo: (TRUE by default) whether to include R source code in the output file.
+* results takes several possible values:
+    * markup (the default) takes the result of the R evaluation and turns it into markdown that is rendered as usual.
+    * hide will hide results.
+    * hold will hold all the output pieces and push them to the end of a chunk. Useful if you’re running commands that result in lots of little pieces of output in the same chunk.
+    * asis writes the raw results from R directly into the document. Only really useful for tables.
+* include: (TRUE by default) if this is set to FALSE the R code is still evaluated, but neither the code nor the results are returned in the output document.
+* fig.width, fig.height: used to control the size of graphics in the output.
+
+```{r optionalChunkName, echo = TRUE, results = 'hide'} 
+# R code here 
+``` 

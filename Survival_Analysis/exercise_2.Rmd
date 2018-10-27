@@ -1,0 +1,63 @@
+---
+title: "Exercise 2"
+author: "Adam Lu"
+date: "2018/3/12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message = FALSE}
+library(dplyr)
+library(survival)
+library(survminer)
+```
+
+Let’s go back to the `colon` cancer dataset. Remember, you created a `colondeath` object in the first exercise that only includes survival (`etype == 2`), not recurrence data points. See `?colon` for more information about this dataset.
+
+```{r, results = 'hide'}
+colon <- as_tibble(colon)
+colondeath <- filter(colon, etype == 2)
+```
+
+1. Take a look at `levels(colondeath$rx)`. This tells you that the `rx` variable is the type of treatment the patient was on, which is either nothing (coded `Obs`, short for Observation), Levamisole (coded `Lev`), or Levamisole + 5-fluorouracil (coded  `Lev+5FU`). This is a factor variable coded with these levels, in that order. This means that Obs is treated as the baseline group, and other groups are dummy-coded to represent the respective group.
+
+```{r}
+levels(colondeath$rx)
+```
+
+2. Run a Cox proportional hazards regression model against this `rx` variable. How do you interpret the result? Which treatment seems to be significantly different from the control (`Obs`ervation)?
+
+```{r}
+fit1 <- coxph(Surv(time, status) ~ rx, data = colondeath)
+fit1
+```
+
+    Answer: The Lev+5FU treatment is significantly different from control with a better survival
+
+3. Show the results using a Kaplan-Meier plot, with confidence intervals and the p-value.
+
+```{r}
+sfit1 <- survfit(Surv(time, status) ~ rx, data = colondeath)
+ggsurvplot(sfit1, conf.int = TRUE, pval = TRUE,
+           legend.labs = c("obs", "rxLev", "rxLev+5FU"),
+           risk.table = TRUE, legend.title = "Treatment")
+```
+
+```{r include = F}
+ggsurvplot(sfit1, conf.int = TRUE, pval = TRUE,
+           legend.labs = c("obs", "rxLev", "rxLev+5FU"),
+           risk.table = TRUE, legend.title = "Treatment",
+           title("Kaplan-Meier Curve for Colon Cancer Survival"))
+```
+
+4. Fit another Cox regression model accounting for age, sex, and the number of nodes with detectable cancer. Notice the test statistic on the likelihood ratio test becomes much larger, and the overall model becomes more significant. What do you think accounted for this increase in our ability to model survival? 
+
+```{r}
+fit2 <- coxph(Surv(time, status) ~ rx + age + sex + nodes, data = colondeath)
+fit2
+```
+
+    Answer: Removed confounding factors

@@ -1,0 +1,90 @@
+---
+title: "Exercise 1"
+author: "Adam Lu"
+date: "2018/3/12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message = FALSE}
+library(dplyr)
+library(survival)
+library(survminer)
+```
+
+Take a look at the built in `colon` dataset. If you type `?colon` it’ll ask you if you wanted help on the colon dataset from the survival package, or the colon operator. Click “Chemotherapy for Stage B/C colon cancer”, or be specific with  `?survival::colon`. This dataset has survival and recurrence information on 929 people from a clinical trial on colon cancer chemotherapy. There are two rows per person, indicated by the event type (`etype`) variable – `etype == 1` indicates that row corresponds to recurrence; `etype == 2` indicates death.
+
+First, let’s turn the `colon` data into a tibble, then filter the data to only include the survival data, not the recurrence data. Let’s call this new object `colondeath`. The `filter()` function is in the `dplyr` library, which you can get by running  `library(dplyr)`. If you don’t have dplyr you can use the base `subset()` function instead.
+
+```{r}
+colon <- as_tibble(colon)
+colon
+colondeath <- filter(colon, etype == 2)
+colondeath
+
+# Or, using base subset()
+# colondeath <- subset(colon, etype == 2)
+
+head(colondeath)
+```
+
+1. Look at the help for `?colon` again. How are `sex` and `status` coded? How is this different from the lung data?
+
+```{r eval = F}
+?survival::colon
+head(colon$sex)
+head(colon$status)
+```
+
+2. Using `survfit(Surv(..., ...,)~..., data=colondeath)`, create a survival curve separately for males versus females. Call the resulting object `sfit`. Run a `summary()` on this object, showing time points 0, 500, 1000, 1500, and 2000. Do males or females appear to fair better over this time period?
+
+```{r}
+sfit1 <- survfit(Surv(time, status) ~ sex, data = colondeath)
+summary(sfit1, times = seq(0, 2000, 500))
+```
+
+    Answer: The survival curves are about the same.
+
+3. Using the survminer package, plot a Kaplan-Meier curve for this analysis with confidence intervals and showing the p-value. See `?ggsurvplot` for help. Is there a significant difference between males and females?
+
+```{r}
+ggsurvplot(sfit1, conf.int = TRUE, pval = TRUE,
+           legend.labs = c("Female", "Male"),
+           risk.table = TRUE, legend.title = "Sex")
+#           title("Kaplan-Meier Curve for Colon Cancer Survival")
+```
+
+    Answer: There is no significant difference between males and females. 
+
+4. Create Kaplan-Meier plot stratifying by:
+a. The extent of differentiation (well, moderate, poor), showing the p-value.   
+
+```{r}
+sfit2 <- survfit(Surv(time, status) ~ differ, data = colondeath)
+summary(sfit2, times = seq(0, 2000, 500))
+ggsurvplot(sfit2, conf.int = TRUE, pval = TRUE,
+           legend.labs = c("well", "moderate", "poor"),
+           risk.table = TRUE, legend.title = "Differentiation")
+#           title("Kaplan-Meier Curve for Colon Cancer Survival")
+```
+
+Whether or not there was detectable cancer in >=4 lymph nodes, showing the p-value and confidence bands. 
+
+```{r}
+sfit3 <- survfit(Surv(time, status) ~ node4, data = colondeath)
+summary(sfit3, times = seq(0, 2000, 500))
+ggsurvplot(sfit3, conf.int = TRUE, pval = TRUE,
+           legend.labs = c("no", "yes"),
+           risk.table = TRUE, legend.title = "At least 4 lymph nodes")
+#           title("Kaplan-Meier Curve for Colon Cancer Survival")
+```
+
+Don't do this: 
+
+```{r}
+sfit4 <- survfit(Surv(time, status) ~ nodes, data = colondeath)
+ggsurvplot(sfit4)
+```

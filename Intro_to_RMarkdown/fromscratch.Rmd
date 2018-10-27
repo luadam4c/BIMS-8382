@@ -1,0 +1,24 @@
+# Introduction 
+  
+This is my first RMarkdown document! 
+  
+# Let's embed some R code 
+  
+Let's load the **Gapminder** data: 
+
+```{r} 
+library(dplyr) 
+library(readr) 
+gm <- read_csv('../data/gapminder.csv') 
+head(gm) 
+``` 
+
+The mean life expectancy is `r mean(gm$lifeExp)` years. 
+
+The years surveyed in this data include: `r unique(gm$year)`. 
+
+# Session Information 
+
+```{r} 
+sessionInfo() 
+``` 

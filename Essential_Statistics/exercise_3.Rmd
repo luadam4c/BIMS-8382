@@ -1,0 +1,106 @@
+---
+title: "Exercise 3"
+author: "Adam Lu"
+date: "2018/03/10"
+output: html_document
+---
+
+First, import libraries
+
+```{r, message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+Next, import the [National Health and Nutrition Examination Survey data](https://www.cdc.gov/nchs/nhanes/index.htm)
+
+```{r, message = FALSE}
+nh <- read_csv("../data/nhanes.csv")
+nh
+```
+
+Change all character data types to the "factor" data type
+
+```{r, message = FALSE}
+nh <- nh %>%
+    mutate_if(is.character, as.factor)
+nh
+```
+
+Filter the data to include adults only
+
+```{r}
+nha <- nh %>% filter(Age >= 18)
+nha
+```
+
+1. What’s the relationship between diabetes and participating in rigorous physical activity or sports?
+
+* Create a contingency table with Diabetes status in rows and physical activity status in columns.
+```{r}
+xt <- xtabs(~ Diabetes + PhysActive, data = nha)
+xt
+```
+    
+* Display that table with margins.
+
+```{r}
+addmargins(xt)
+```
+    
+* Show the proportions of diabetics and nondiabetics, separately, who are physically 
+active or not.
+
+```{r}
+prop.table(xt, margin = 1)
+```
+    
+* Is this relationship significant?
+
+```{r}
+# Use the Pearson's Chi-squared test with Yates' continuity correction
+chisq.test(xt)
+
+# Fisher's Exact Test for Count Data
+# https://en.wikipedia.org/wiki/Fisher%27s_exact_test
+fisher.test(xt)
+```
+    
+* Create a mosaic plot to visualize the relationship.
+
+```{r}
+mosaicplot(xt, main = "Diabetics are less physically active")
+```
+    
+2. Model the same association in a logistic regression framework to assess the risk of diabetes using physical activity as a predictor.
+
+* Fit a model with just physical activity as a predictor, and display a model summary.
+
+```{r}
+fit <- glm(Diabetes ~ PhysActive, data = nha, family = "binomial")
+summary(fit)
+```
+    
+* Add gender to the model, and show a summary.
+
+```{r}
+fit <- glm(Diabetes ~ PhysActive + Gender, data = nha, family = "binomial")
+summary(fit)
+```
+    
+* Continue adding weight and age to the model. What happens to the gender association?
+
+```{r}
+fit <- glm(Diabetes ~ PhysActive + Gender + Weight + Age, data = nha, family = "binomial")
+summary(fit)
+```
+    
+* Continue and add income to the model. What happens to the original association with physical activity?
+
+```{r}
+fit <- glm(Diabetes ~ PhysActive + Gender + Weight + Age + Income, data = nha, family = "binomial")
+summary(fit)
+```
+    
+    

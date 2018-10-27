@@ -1,0 +1,62 @@
+---
+title: "Exercise 3"
+author: "Adam Lu"
+date: "2018/3/12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message = FALSE}
+library(dplyr)
+library(survival)
+library(survminer)
+library(RTCGA)
+library(RTCGA.clinical)
+```
+
+The **“KIPAN”** cohort (in `KIPAN.clinical`) is the pan-kidney cohort, consisting of KICH (chromaphobe renal cell carcinoma), KIRC (renal clear cell carcinoma), and KIRP (papillary cell carcinoma). The `KIPAN.clinical` has `KICH.clinical`, `KIRC.clinical`, and `KIPR.clinical` all combined.
+
+1. Using `survivalTCGA()`, create a new object called `clinkid` using the `KIPAN.clinical` cohort. For the columns to extract, get both the disease code and the patient’s gender (`extract.cols=c("admin.disease_code", "patient.gender")`). The first few rows will look like this.
+
+```{r}
+clinkid <- survivalTCGA(KIPAN.clinical, 
+                        extract.cols = c("admin.disease_code",
+                                         "patient.gender"))
+head(clinkid)
+```
+
+2. The xtabs() command will produce tables of counts for categorical variables. Use this command to examine how many samples you have for each kidney sample type, separately by sex.
+
+```{r}
+xtabs(~ admin.disease_code + patient.gender, data = clinkid)
+```
+
+
+3. Run a Cox PH regression on the cancer type and gender. What’s the effect of gender? Is it significant? How does survival differ by each type? Which has the worst prognosis?
+
+```{r}
+coxph(Surv(times, patient.vital_status) ~ 
+              admin.disease_code + patient.gender, data = clinkid)
+```
+
+    Answer: Male had slightly better survival but the effect was not significant. Papillary cell carcinoma had the worst prognosis. 
+
+4. Create survival curves for each different subtype. 
+    a. Produce a Kaplan-Meier plot. 
+
+```{r}
+sfit <- 
+    survfit(Surv(times, patient.vital_status) ~ admin.disease_code,
+            data = clinkid)
+
+ggsurvplot(sfit, conf.int = TRUE, pval = TRUE)
+```
+
+    b. Show survival tables each year for the first 5 years.
+
+```{r}
+summary(sfit, times=seq(0, 365*5, 365))
+```

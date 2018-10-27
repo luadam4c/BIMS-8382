@@ -1,0 +1,353 @@
+---
+title: "Survival Analysis with R"
+author: "Adam Lu"
+date: "2018/03/12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Notes are from [**this lecture**] (http://bims.fun/r-survival.html)
+
+## Definitions
+
+Survival analysis lets you analyze the **rates of occurrence** of events over time, without assuming the rates are constant.
+
+The **hazard** is the instantaneous event (death) rate at a particular time point t. 
+
+The **cumulative hazard** is the total hazard experienced up to time t.
+
+The **survival function** is the probability an individual survives (or, the probability that the event of interest does not occur) up to and including time t.
+
+The **Kaplan-Meier curve** illustrates the survival function. It’s a step function illustrating the cumulative survival probability over time. The curve is horizontal over periods where no event occurs, then drops vertically corresponding to a change in the survival function at each time an event occurs.
+
+**Censoring** is a type of missing data problem unique to survival analysis. The sample is censored in that you only know that the individual survived up to the loss to followup, but you don’t know anything about survival after that.
+
+**Proportional hazards assumption**: Survival analysis doesn’t assume that the hazard is constant, but does assume that the ratio of hazards between groups is constant over time.
+
+**Proportional hazards regression** a.k.a. **Cox regression** is the most common approach to assess the effect of different variables on survival.
+
+The interpretation of the hazards ratio depends on the measurement scale of the predictor variable, but in simple terms, a **positive coefficient** indicates **worse survival** and a negative coefficient indicates better survival for the variable in question.
+
+```{r message = FALSE}
+library(dplyr)
+library(survival)
+library(survminer)
+```
+
+There are **built-in data sets**:
+
+```{r eval = FALSE}
+# Flowers
+iris
+
+# Cars
+mtcars
+```
+
+A built-in data set from the **survival package**: 
+
+```{r eval = FALSE}
+# Lung cancer data
+lung
+
+# Information on lung cancer data
+?survival::lung
+```
+
+The original lung data set is in a data.frame format, which can be turned into a tibble with **as_tibble()**
+
+```{r}
+# Turn the data into a tibble
+lung <- as_tibble(lung)
+lung
+```
+
+## Survival Curves
+
+Create a **survival object** with **Surv()**:
+
+```{r}
+s <- Surv(time = lung$time, time2 = lung$status)
+s
+```
+
+Fit a **survival curve** to the survival object:
+
+```{r}
+# ~ 1 means fitting with just an intercept
+survfit(s ~ 1)
+```
+
+Or do it altogether:
+
+```{r}
+sfit1 <- survfit(Surv(time, status) ~ 1, data = lung)
+sfit1
+```
+
+Get the **survival table** (survival function):
+
+```{r}
+# This is actually calling summary.survfit()
+summary(sfit1)
+```
+
+Get the range of all event times:
+
+```{r}
+range(lung$time)
+```
+
+Recompute the survival function with different time points:
+
+```{r}
+summary(sfit1, times = seq(0, 1100, 100))
+```
+
+Get a survival curve for each sex:
+
+```{r}
+sfit2 <- survfit(Surv(time, status) ~ sex, data = lung)
+summary(sfit2, times = seq(0, 1100, 100))
+```
+
+Get a survival curve for each sex, institution pair:
+
+```{r}
+sfit3 <- survfit(Surv(time, status) ~ sex + inst, data = lung)
+summary(sfit3, times = seq(0, 1100, 100))
+```
+
+## Kaplan-Meier Plots
+
+Plot a survival curve:
+
+```{r}
+plot(sfit2)
+```
+
+Plot a survival curve with the **survminer** package:
+
+```{r}
+ggsurvplot(sfit2)
+```
+
+Plot confidence intervals and p values (log-rank class) and add risk tables:
+
+```{r}
+ggsurvplot(sfit2, conf.int = TRUE, pval = TRUE, 
+           legend.labs = c("Male", "Female"),
+           risk.table = TRUE, legend.title = "Sex",
+           palette = c("dodgerblue2", "orchid2"),
+           title("Kaplan-Meier Curve for Lung Cancer Survival"),
+           risk.table.height = .15
+           )
+```
+
+The actual statistical test: Test for differences in survival between two groups using a log-rank / Mantel-Haenszel test
+
+```{r}
+survdiff(Surv(time, status) ~ sex, data = lung)
+```
+
+## Cox Regression
+
+Look at the coefficient, negative means better survival:
+
+```{r}
+fit2 <- coxph(Surv(time, status) ~ sex, data = lung)
+fit2
+summary(fit2)
+```
+
+```{r}
+fit4 <- coxph(Surv(time, status) ~ sex + ph.ecog, data = lung)
+fit4
+```
+
+```{r}
+fit4 <- coxph(Surv(time, status) ~ sex + ph.ecog + ph.karno + pat.karno + meal.cal + wt.loss, data = lung)
+fit4
+```
+
+## Categorizing for KM plots
+
+Age is very slightly significant when modeled as a continuous variable:
+
+```{r}
+coxph(Surv(time, status) ~ age, data = lung)
+```
+
+Make a Kaplan-Meier plot, which is messy:
+
+```{r}
+ggsurvplot(survfit(Surv(time, status) ~ age, data = lung))
+```
+
+Take a look at the distribution of Age:
+
+```{r}
+mean(lung$age)
+hist(lung$age)
+ggplot(lung, aes(age)) + geom_histogram(bins = 20)
+```
+
+Discretize the age variable by binning the data using `cut()`:
+
+```{r}
+lung1 <- 
+    lung %>% 
+    mutate(agecat = cut(age, breaks = c(0, 62, Inf), 
+                        labels =  c("young", "old")))
+lung1
+```
+
+Plot the Kaplan-Meier Curve for each age group and show p-value:
+
+```{r}
+ggsurvplot(survfit(Surv(time, status) ~ agecat, data = lung1),
+           pval = TRUE)
+```
+
+    This was not significant
+
+Use a different cutoff for binning and reanalyze:
+
+```{r}
+lung2 <- 
+    lung %>% 
+    mutate(agecat = cut(age, breaks = c(0, 70, Inf), 
+                        labels =  c("young", "old")))
+ggsurvplot(survfit(Surv(time, status) ~ agecat, data = lung2),
+           pval = TRUE)
+```
+
+    This was significant
+
+Someone might use [these functions](http://www.sthda.com/english/wiki/survminer-0-2-4#determine-the-optimal-cutpoint-for-continuous-variables) for p-hacking: `surv_cutpoint()` and `surv_categorize()`
+
+## RTCGA
+
+[*The Cancer Genome Atlas (TCGA)*](cancergenome.nih.gov) is a collaboration between the National Cancer Institute (NCI) and the National Human Genome Research Institute (NHGRI) that collected lots of clinical and genomic data across 33 cancer types.
+
+The [**RTCGA package**](bioconductor.org/packages/RTCGA) and all the associated data packages provide convenient access to clinical and genomic data in TCGA.
+
+```{r}
+# Load TCGA
+library(RTCGA)
+infoTCGA()
+```
+
+The `RTCGA.clinical` package contains all the clinical datasets available for each cancer type: 
+
+```{r}
+library(RTCGA.clinical)
+?clinical
+```
+
+Look at how big the data is:
+
+```{r}
+dim(BRCA.clinical)
+names(BRCA.clinical)
+# View(BRCA.clinical)
+```
+
+We’re going to use the `survivalTCGA()` function from the RTCGA package to pull out survival information from the clinical data. It does this by looking at vital status (dead or alive) and creating a times variable that’s either the days to death or the days followed up before being censored. Let’s look at breast cancer, ovarian cancer, and glioblastoma multiforme. Let’s just extract the cancer type (`admin.disease_code`).
+
+```{r}
+# Create the clinical data
+clin <- survivalTCGA(BRCA.clinical, OV.clinical, GBM.clinical, 
+                     extract.cols = "admin.disease_code")
+# Show the first few lines
+head(clin)
+
+# How many samples of each type?
+table(clin$admin.disease_code)
+
+# Tabulate by outcome
+xtabs(~ admin.disease_code + patient.vital_status , data=clin) %>%
+    addmargins()
+```
+
+Now let’s run a Cox PH model against the disease code. By default it’s going to treat breast cancer as the baseline, because alphabetically it’s first. But you can reorder this if you want with `factor()`
+
+```{r}
+coxph(Surv(times, patient.vital_status) ~ admin.disease_code,
+      data = clin)
+```
+
+This tells us that compared to the baseline brca group, GBM patients have a ~18x increase in hazards, and ovarian cancer patients have ~5x worse survival. Let’s create a survival curve, visualize it with a Kaplan-Meier plot, and show a table for the first 5 years survival rates.
+
+```{r}
+sfit5 <- 
+    survfit(Surv(times, patient.vital_status) ~ admin.disease_code,
+            data = clin)
+summary(sfit5, times=seq(0, 365*5, 365))
+```
+
+```{r}
+ggsurvplot(sfit, conf.int = TRUE, pval = TRUE)
+```
+
+## Gene Expression Data
+
+Let’s load the gene expression data.
+
+```{r}
+# Load TCGA
+library(RTCGA.mRNA)
+?mRNA
+```
+
+Take a look at the size of the BRCA.mRNA dataset, show a few rows and columns:
+
+```{r}
+dim(BRCA.mRNA)
+BRCA.mRNA[1:10, 1:10]
+```
+
+Join the gene expression data to the clinical data for any particular cancer type:
+
+```{r}
+# Take the mRNA data
+BRCA.mRNA %>% 
+  # then make it a tibble (nice printing while debugging)
+  as_tibble() %>% 
+  # then get just a few genes
+  select(bcr_patient_barcode, PAX8, GATA3, ESR1) %>% 
+  # then trim the barcode (see head(clin), and ?substr)
+  mutate(bcr_patient_barcode = substr(bcr_patient_barcode, 1, 12)) %>% 
+  # then join back to clinical data
+  inner_join(clin, by="bcr_patient_barcode")
+```
+
+Similar to how survivalTCGA() was a nice helper function to pull out survival information from multiple different clinical datasets, expressionsTCGA() can pull out specific gene expression measurements across different cancer types. Let’s pull out data for PAX8, GATA-3, and the estrogen receptor genes from breast, ovarian, and endometrial cancer, and plot the expression of each with a box plot.
+
+```{r}
+expr <- 
+    expressionsTCGA(BRCA.mRNA, OV.mRNA, UCEC.mRNA, 
+                    extract.cols = c("PAX8", "GATA3", "ESR1"))
+head(expr)
+ggplot(expr, aes(dataset, GATA3, fill = dataset)) + geom_boxplot()
+
+library(tidyr)
+expr %>%
+    as_tibble() %>% 
+    gather(gene, expression, PAX8:ESR1) %>% 
+    ggplot(aes(dataset, expression, fill = dataset)) +
+        geom_boxplot() + facet_wrap(~ gene)
+```
+
+
+
+```{r}
+library(readxl)
+?read_excel
+library(janitor)
+?clean_names
+```
+
